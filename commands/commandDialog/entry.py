@@ -10,8 +10,8 @@ ui = app.userInterface
 
 # TODO *** Specify the command identity information. ***
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_cmdDialog'
-CMD_NAME = 'Project Decimated'
-CMD_Description = 'Project a profile that has been simplified by removing unnecessary points'
+CMD_NAME = 'Decimate Lines'
+CMD_Description = 'Simplify by removing unnecessary points'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = True
@@ -112,10 +112,16 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     slider = inputs.addFloatSliderCommandInput(
         DIST_SLIDER_ID, "Min Distance", "mm", 0.0001, 1, False)
-    slider.valueOne = 0.01
+    slider.valueOne = 0.3
 
-    angle = inputs.addAngleValueCommandInput(
-        ANGLE_SLIDER_ID, "Angle tolerance", adsk.core.ValueInput.createByString("1"))
+    angles = []
+    startangle = 0.25
+    while startangle <= 10:
+        angles.append(startangle)
+        startangle = startangle + 0.25
+
+    angle = inputs.addFloatSliderListCommandInput(
+        ANGLE_SLIDER_ID, "Angle tolerance", "", angles, False)
 
     # TODO Connect to the events that are needed by this command.
     futil.add_handler(args.command.execute, command_execute,
@@ -146,7 +152,17 @@ def command_execute(args: adsk.core.CommandEventArgs):
     if DO_RESCAN:
         LINELIST = processSelection(inputs)
 
-    ui.messageBox(f"{len(LINELIST)} lines")
+    points = Decimate(inputs, LINELIST)
+    sketch = LINELIST[0].parentSketch
+    sketchlines = sketch.sketchCurves.sketchLines
+
+    for line in LINELIST:
+        line.deleteMe()
+
+    spoints = [sketch.sketchPoints.add(pt) for pt in points]
+
+    for x in range(len(spoints)-1):
+        sketchlines.addByTwoPoints(spoints[x], spoints[x+1])
 
 
 def contains(list, item):
@@ -272,8 +288,8 @@ def display(points):
 def Decimate(inputs: adsk.core.CommandInputs, lines):
     dist: adsk.core.FloatSliderCommandInput = inputs.itemById(DIST_SLIDER_ID)
     mindist = dist.valueOne
-    angl: adsk.core.AngleValueCommandInput = inputs.itemById(ANGLE_SLIDER_ID)
-    maxAngle = angl.value
+    angl: adsk.core.FloatSliderCommandInput = inputs.itemById(ANGLE_SLIDER_ID)
+    maxAngle = angl.valueOne * pi / 180
 
     if len(lines) == 1:
         points = [lines[0].startSketchPoint.geometry,
@@ -293,8 +309,7 @@ def Decimate(inputs: adsk.core.CommandInputs, lines):
 
     for x in range(len(lines)):
         line = lines[x]
-        futil.log(
-            f"L1 {PT2S(line.startSketchPoint.geometry)} - {PT2S(line.endSketchPoint.geometry)}")
+        #futil.log(f"L1 {PT2S(line.startSketchPoint.geometry)} - {PT2S(line.endSketchPoint.geometry)}")
         nextLine = line
         if x == len(lines)-1:
             if openEnded:
@@ -311,8 +326,7 @@ def Decimate(inputs: adsk.core.CommandInputs, lines):
         angleTest = False
 
         if nextLine:
-            futil.log(
-                f"L2 {PT2S(nextLine.startSketchPoint.geometry)} - {PT2S(nextLine.endSketchPoint.geometry)}")
+            #futil.log(f"L2 {PT2S(nextLine.startSketchPoint.geometry)} - {PT2S(nextLine.endSketchPoint.geometry)}")
             nextPoint = nextLine.endSketchPoint.geometry
             if point.isEqualTo(nextPoint):
                 nextPoint = nextLine.startSketchPoint.geometry
@@ -326,6 +340,9 @@ def Decimate(inputs: adsk.core.CommandInputs, lines):
         if (not angleTest) or vector.length > mindist:
             currentPoint = point
             points.append(currentPoint)
+
+    if (not openEnded) and (not points[0].isEqualTo(points[len(points)-1])):
+        points.append(points[0])
 
     return points
 
