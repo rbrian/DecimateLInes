@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"2b508f65-b330-4090-a445-d60312281e99",
+	"author":	"Lindahl Engineering",
+	"description":	{
+		"":	"Simplify a dense sketch curve by deleting unnecessary points"
+	},
+	"version":	"0.1",
+	"runOnStartup":	true,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
